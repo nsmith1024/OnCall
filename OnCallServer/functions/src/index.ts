@@ -1,58 +1,164 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/https";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
-//import {setGlobalOptions} from "firebase-functions";
-//import {onRequest} from "firebase-functions/https";
-//import * as logger from "firebase-functions/logger";
-
-// Start writing functions
-// https://firebase.google.com/docs/functions/typescript
-
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-//setGlobalOptions({ maxInstances: 10 });
-
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });import { onRequest } from "firebase-functions/v2/https";
-import { onRequest } from "firebase-functions/v2/https";
+import {setGlobalOptions} from "firebase-functions/v2";
+import {onRequest, Request} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import {Response} from "express";
 
 admin.initializeApp();
 const db = admin.firestore();
+setGlobalOptions({region: "us-central1", maxInstances: 10});
 
-// HTTP endpoint exposed to external clients like .NET MAUI
-export const getValue = onRequest({ cors: true }, async (req, res) => {
-    try {
-        // Read the document created in Step 1
-        const docRef = db.collection("system_data").doc("app_config");
-        const docSnap = await docRef.get();
+type Handler = (req: Request, res: Response) => Promise<void>;
 
-        if (!docSnap.exists) {
-            res.status(404).json({ error: "Document not found" });
-            return;
-        }
+function requiredText(value: unknown, field: string, maxLength: number): string {
+  if (typeof value !== "string" || !value.trim() || value.trim().length > maxLength) {
+    throw new Error(`INVALID_${field.toUpperCase()}`);
+  }
+  return value.trim();
+}
 
-        const data = docSnap.data();
-        // Return the value as JSON
-        res.status(200).json({ value: data?.status_message });
-    } catch (error) {
-        res.status(500).json({ error: (error as Error).message });
+function requiredNumber(value: unknown, field: string, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`INVALID_${field.toUpperCase()}`);
+  }
+  return value;
+}
+
+async function authenticate(req: Request): Promise<admin.auth.DecodedIdToken> {
+  const header = req.header("authorization") ?? "";
+  if (!header.startsWith("Bearer ")) throw new Error("UNAUTHENTICATED");
+  return admin.auth().verifyIdToken(header.substring(7));
+}
+
+function statusFor(error: unknown): number {
+  const message = error instanceof Error ? error.message : "UNKNOWN";
+  if (message === "UNAUTHENTICATED" || message.includes("ID token")) return 401;
+  if (message === "FORBIDDEN") return 403;
+  if (message === "NOT_FOUND") return 404;
+  if (message === "CONFLICT") return 409;
+  if (message.startsWith("INVALID_")) return 400;
+  return 500;
+}
+
+function endpoint(handler: Handler) {
+  return onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
     }
+    try {
+      await handler(req, res);
+    } catch (error) {
+      res.status(statusFor(error)).json({
+        error: error instanceof Error ? error.message : "UNKNOWN",
+      });
+    }
+  });
+}
+
+export const getMyProfile = endpoint(async (req, res) => {
+  const user = await authenticate(req);
+  const ref = db.collection("users").doc(user.uid);
+  let profile = await ref.get();
+  if (!profile.exists) {
+    await ref.create({
+      email: user.email ?? null,
+      displayName: user.email?.split("@")[0] ?? "OnCall user",
+      role: "client",
+      accountStatus: "active",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    profile = await ref.get();
+  }
+  res.status(200).json({id: profile.id, ...profile.data()});
 });
 
+export const updateMyProfile = endpoint(async (req, res) => {
+  if (req.method !== "POST") throw new Error("INVALID_METHOD");
+  const user = await authenticate(req);
+  const displayName = requiredText(req.body?.displayName, "displayName", 80);
+  const ref = db.collection("users").doc(user.uid);
+  const profile = await ref.get();
+  if (!profile.exists) {
+    await ref.create({
+      email: user.email ?? null, displayName, role: "client", accountStatus: "active",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } else {
+    await ref.update({displayName, updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+  }
+  res.status(200).json({ok: true});
+});
+
+export const createLegalRequest = endpoint(async (req, res) => {
+  if (req.method !== "POST") throw new Error("INVALID_METHOD");
+  const user = await authenticate(req);
+  const incidentType = requiredText(req.body?.incidentType, "incidentType", 60).toLowerCase();
+  const latitude = requiredNumber(req.body?.latitude, "latitude", -90, 90);
+  const longitude = requiredNumber(req.body?.longitude, "longitude", -180, 180);
+  const city = requiredText(req.body?.city, "city", 100);
+  const state = requiredText(req.body?.state, "state", 40).toUpperCase();
+  const profile = await db.collection("users").doc(user.uid).get();
+  if (!profile.exists || profile.get("role") !== "client" || profile.get("accountStatus") !== "active") {
+    throw new Error("FORBIDDEN");
+  }
+  const existing = await db.collection("legalRequests")
+    .where("clientId", "==", user.uid)
+    .where("status", "in", ["searching", "assigned"]).limit(1).get();
+  if (!existing.empty) throw new Error("CONFLICT");
+  const ref = db.collection("legalRequests").doc();
+  await ref.create({
+    clientId: user.uid, incidentType,
+    location: new admin.firestore.GeoPoint(latitude, longitude), city, state,
+    status: "searching", assignedLawyerId: null,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  res.status(201).json({requestId: ref.id, status: "searching"});
+});
+
+export const acceptLegalRequest = endpoint(async (req, res) => {
+  if (req.method !== "POST") throw new Error("INVALID_METHOD");
+  const user = await authenticate(req);
+  const requestId = requiredText(req.body?.requestId, "requestId", 128);
+  const userRef = db.collection("users").doc(user.uid);
+  const lawyerRef = db.collection("lawyers").doc(user.uid);
+  const requestRef = db.collection("legalRequests").doc(requestId);
+  await db.runTransaction(async (transaction) => {
+    const [profile, lawyer, legalRequest] = await Promise.all([
+      transaction.get(userRef), transaction.get(lawyerRef), transaction.get(requestRef),
+    ]);
+    if (!profile.exists || profile.get("role") !== "lawyer" || profile.get("accountStatus") !== "active") throw new Error("FORBIDDEN");
+    if (!lawyer.exists || lawyer.get("verificationStatus") !== "approved" || lawyer.get("acceptingRequests") !== true) throw new Error("FORBIDDEN");
+    if (!legalRequest.exists) throw new Error("NOT_FOUND");
+    if (legalRequest.get("status") !== "searching") throw new Error("CONFLICT");
+    if (!(lawyer.get("licensedStates") as string[] | undefined)?.includes(legalRequest.get("state"))) throw new Error("FORBIDDEN");
+    transaction.update(requestRef, {
+      status: "assigned", assignedLawyerId: user.uid,
+      assignedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  res.status(200).json({requestId, status: "assigned", lawyerId: user.uid});
+});
+
+// This helper cannot run after deployment; it exists only for local emulator testing.
+export const seedDemoLawyer = endpoint(async (req, res) => {
+  if (process.env.FUNCTIONS_EMULATOR !== "true") throw new Error("NOT_FOUND");
+  if (req.method !== "POST") throw new Error("INVALID_METHOD");
+  const user = await authenticate(req);
+  await db.collection("users").doc(user.uid).set({
+    email: user.email ?? null, displayName: "Demo Lawyer", role: "lawyer", accountStatus: "active",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, {merge: true});
+  await db.collection("lawyers").doc(user.uid).set({
+    verificationStatus: "approved", licensedStates: ["NY"],
+    practiceAreas: ["traffic", "criminal"], serviceCities: ["Albany", "Troy"],
+    acceptingRequests: true, updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, {merge: true});
+  res.status(200).json({ok: true, role: "lawyer"});
+});
