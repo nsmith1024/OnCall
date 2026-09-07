@@ -1,0 +1,37 @@
+# Operating system and editors
+.DS_Store
+Thumbs.db
+.vs/
+.vscode/
+*.user
+*.suo
+
+# .NET / MAUI build output
+**/bin/
+**/obj/
+artifacts/
+
+# Node / Firebase generated content
+**/node_modules/
+**/functions/lib/
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+*.log
+
+# Tests and coverage
+coverage/
+.nyc_output/
+TestResults/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+secrets.json
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+
