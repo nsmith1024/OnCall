@@ -153,6 +153,24 @@ export const getMyOffers = endpoint(async (req, res) => {
   res.status(200).json({offers: offers.docs.map((offer) => ({id: offer.id, ...offer.data()}))});
 });
 
+export const setLawyerAvailability = endpoint(async (req, res) => {
+  if (req.method !== "POST") throw new Error("INVALID_METHOD");
+  const user = await authenticate(req);
+  if (typeof req.body?.available !== "boolean") throw new Error("INVALID_AVAILABLE");
+  const profile = await db.collection("users").doc(user.uid).get();
+  const lawyerRef = db.collection("lawyers").doc(user.uid);
+  const lawyer = await lawyerRef.get();
+  if (!profile.exists || profile.get("role") !== "lawyer" || !lawyer.exists || lawyer.get("verificationStatus") !== "approved") {
+    throw new Error("FORBIDDEN");
+  }
+  await lawyerRef.update({
+    acceptingRequests: req.body.available,
+    lastPresenceAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  res.status(200).json({available: req.body.available});
+});
+
 export const acceptLegalRequest = endpoint(async (req, res) => {
   if (req.method !== "POST") throw new Error("INVALID_METHOD");
   const user = await authenticate(req);

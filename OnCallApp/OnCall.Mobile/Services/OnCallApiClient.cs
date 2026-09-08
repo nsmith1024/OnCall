@@ -11,6 +11,11 @@ public sealed class OnCallApiClient(HttpClient http, OnCallEnvironment environme
     public Task<UserProfile> GetMyProfileAsync(CancellationToken token = default) => SendAsync<UserProfile>(HttpMethod.Get, "getMyProfile", null, token);
     public Task<RequestCreated> CreateLegalRequestAsync(string type, double latitude, double longitude, string city, string state, CancellationToken token = default) =>
         SendAsync<RequestCreated>(HttpMethod.Post, "createLegalRequest", new {incidentType = type, latitude, longitude, city, state}, token);
+    public Task<OfferList> GetMyOffersAsync(CancellationToken token = default) => SendAsync<OfferList>(HttpMethod.Get, "getMyOffers", null, token);
+    public Task<AvailabilityResult> SetAvailabilityAsync(bool available, CancellationToken token = default) =>
+        SendAsync<AvailabilityResult>(HttpMethod.Post, "setLawyerAvailability", new {available}, token);
+    public Task<AssignmentResult> AcceptOfferAsync(string requestId, CancellationToken token = default) =>
+        SendAsync<AssignmentResult>(HttpMethod.Post, "acceptLegalRequest", new {requestId}, token);
 
     private async Task<T> SendAsync<T>(HttpMethod method, string function, object? body, CancellationToken token)
     {
@@ -31,3 +36,7 @@ public sealed class OnCallApiClient(HttpClient http, OnCallEnvironment environme
 }
 
 public sealed record RequestCreated(string RequestId, string Status, int OfferedLawyerCount);
+public sealed record LegalOffer(string Id, string RequestId, string IncidentType, string City, string State, string Status);
+public sealed record OfferList(IReadOnlyList<LegalOffer> Offers);
+public sealed record AvailabilityResult(bool Available);
+public sealed record AssignmentResult(string RequestId, string Status, string LawyerId);

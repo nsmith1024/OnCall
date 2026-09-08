@@ -10,6 +10,7 @@ public partial class MainPage : ContentPage
     private readonly DeviceLocationService locations;
     private ResolvedLocation? currentLocation;
     private bool initialized;
+    private bool loadingProfile;
 
     public MainPage(FirebaseAuthService auth, OnCallApiClient api, DeviceLocationService locations)
     {
@@ -58,6 +59,9 @@ public partial class MainPage : ContentPage
         RoleLabel.Text = $"Role: {profile.Role}";
         EmailLabel.Text = profile.Email ?? auth.CurrentSession?.Email ?? "";
         bool lawyer = string.Equals(profile.Role, "lawyer", StringComparison.OrdinalIgnoreCase);
+        loadingProfile = true;
+        AvailabilitySwitch.IsToggled = false;
+        loadingProfile = false;
         ClientPanel.IsVisible = !lawyer;
         LawyerPanel.IsVisible = lawyer;
         AuthPanel.IsVisible = false;
@@ -96,6 +100,39 @@ public partial class MainPage : ContentPage
         HomePanel.IsVisible = false;
         AuthPanel.IsVisible = true;
         StatusLabel.Text = "Signed out.";
+    }
+
+    private async void OnAvailabilityToggled(object? sender, ToggledEventArgs e)
+    {
+        if (loadingProfile || !LawyerPanel.IsVisible) return;
+        await RunBusyAsync(async () =>
+        {
+            AvailabilityResult result = await api.SetAvailabilityAsync(e.Value);
+            StatusLabel.Text = result.Available ? "You are available for requests." : "You are off duty.";
+            if (result.Available) await RefreshOffersAsync();
+        });
+    }
+
+    private async void OnRefreshOffersClicked(object? sender, EventArgs e) => await RunBusyAsync(RefreshOffersAsync);
+
+    private async Task RefreshOffersAsync()
+    {
+        OfferList result = await api.GetMyOffersAsync();
+        OffersView.ItemsSource = result.Offers;
+    }
+
+    private async void OnOfferSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is not LegalOffer offer) return;
+        OffersView.SelectedItem = null;
+        bool accept = await DisplayAlertAsync("Accept request?", $"{offer.IncidentType} help in {offer.City}, {offer.State}", "Accept", "Cancel");
+        if (!accept) return;
+        await RunBusyAsync(async () =>
+        {
+            AssignmentResult result = await api.AcceptOfferAsync(offer.RequestId);
+            StatusLabel.Text = $"Request {result.RequestId[..8]} assigned to you.";
+            await RefreshOffersAsync();
+        });
     }
 
     private async Task RunBusyAsync(Func<Task> operation, bool showErrors = true)

@@ -26,6 +26,13 @@ allow cleartext HTTP for this purpose; production will use HTTPS.
 
 The Firebase Emulator UI is available at <http://127.0.0.1:4000>.
 
+With the emulators running, execute the repeatable end-to-end backend test:
+
+```powershell
+cd OnCallServer\functions
+npm run test:integration
+```
+
 ## Build checks
 
 ```powershell

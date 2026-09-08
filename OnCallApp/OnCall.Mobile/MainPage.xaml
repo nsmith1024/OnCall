@@ -41,7 +41,24 @@
 
                 <VerticalStackLayout x:Name="LawyerPanel" IsVisible="False" Spacing="12">
                     <Label Text="Lawyer dashboard" FontSize="20" FontAttributes="Bold" />
-                    <Label Text="Availability and incoming requests are the next milestone." />
+                    <HorizontalStackLayout Spacing="12">
+                        <Label Text="Available for requests" VerticalOptions="Center" />
+                        <Switch x:Name="AvailabilitySwitch" Toggled="OnAvailabilityToggled" />
+                    </HorizontalStackLayout>
+                    <Button Text="Refresh Incoming Requests" Clicked="OnRefreshOffersClicked" />
+                    <CollectionView x:Name="OffersView" SelectionMode="Single" SelectionChanged="OnOfferSelected" EmptyView="No incoming requests.">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Stroke="#DDDDDD" StrokeShape="RoundRectangle 10" Padding="12" Margin="0,4">
+                                    <VerticalStackLayout>
+                                        <Label Text="{Binding IncidentType}" FontAttributes="Bold" />
+                                        <Label Text="{Binding City}" />
+                                        <Label Text="Tap to accept" FontSize="12" TextColor="Gray" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
                 </VerticalStackLayout>
 
                 <Button Text="Sign Out" Clicked="OnSignOutClicked" />
