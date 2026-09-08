@@ -7,13 +7,16 @@ public partial class MainPage : ContentPage
 {
     private readonly FirebaseAuthService auth;
     private readonly OnCallApiClient api;
+    private readonly DeviceLocationService locations;
+    private ResolvedLocation? currentLocation;
     private bool initialized;
 
-    public MainPage(FirebaseAuthService auth, OnCallApiClient api)
+    public MainPage(FirebaseAuthService auth, OnCallApiClient api, DeviceLocationService locations)
     {
         InitializeComponent();
         this.auth = auth;
         this.api = api;
+        this.locations = locations;
         IncidentPicker.SelectedIndex = 0;
     }
 
@@ -63,18 +66,27 @@ public partial class MainPage : ContentPage
 
     private async void OnRequestLawyerClicked(object? sender, EventArgs e)
     {
-        string city = CityEntry.Text?.Trim() ?? "";
-        string state = StateEntry.Text?.Trim() ?? "";
-        if (string.IsNullOrWhiteSpace(city) || state.Length != 2)
+        if (currentLocation is null)
         {
-            StatusLabel.Text = "Enter a city and two-letter state for this development build.";
+            StatusLabel.Text = "Use your current location before requesting a lawyer.";
             return;
         }
         await RunBusyAsync(async () =>
         {
-            // Coordinates are temporary test values; device GPS replaces them next.
-            RequestCreated result = await api.CreateLegalRequestAsync(IncidentPicker.SelectedItem?.ToString() ?? "Other", 42.6526, -73.7562, city, state);
-            StatusLabel.Text = $"Request {result.RequestId[..8]} is now {result.Status}.";
+            RequestCreated result = await api.CreateLegalRequestAsync(IncidentPicker.SelectedItem?.ToString() ?? "Other",
+                currentLocation.Latitude, currentLocation.Longitude, currentLocation.City, currentLocation.State);
+            StatusLabel.Text = result.OfferedLawyerCount > 0
+                ? $"Request {result.RequestId[..8]} sent to {result.OfferedLawyerCount} available lawyer(s)."
+                : $"Request {result.RequestId[..8]} is searching; no demo lawyer is currently available.";
+        });
+    }
+
+    private async void OnUseLocationClicked(object? sender, EventArgs e)
+    {
+        await RunBusyAsync(async () =>
+        {
+            currentLocation = await locations.GetCurrentAsync();
+            LocationLabel.Text = $"{currentLocation.City}, {currentLocation.State}";
         });
     }
 

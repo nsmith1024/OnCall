@@ -34,8 +34,8 @@
                     <Picker x:Name="IncidentPicker" Title="Type of help">
                         <Picker.Items><x:String>Traffic</x:String><x:String>Criminal</x:String><x:String>Other</x:String></Picker.Items>
                     </Picker>
-                    <Entry x:Name="CityEntry" Placeholder="City (temporary until GPS milestone)" />
-                    <Entry x:Name="StateEntry" Placeholder="State, for example NY" MaxLength="2" />
+                    <Button Text="Use My Current Location" Clicked="OnUseLocationClicked" />
+                    <Label x:Name="LocationLabel" Text="Location has not been collected." TextColor="Gray" />
                     <Button Text="Request a Lawyer" Clicked="OnRequestLawyerClicked" BackgroundColor="#B42318" TextColor="White" />
                 </VerticalStackLayout>
 

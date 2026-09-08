@@ -120,7 +120,37 @@ export const createLegalRequest = endpoint(async (req, res) => {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
-  res.status(201).json({requestId: ref.id, status: "searching"});
+
+  const candidates = await db.collection("lawyers").where("acceptingRequests", "==", true).limit(50).get();
+  const matches = candidates.docs.filter((lawyer) => {
+    const licensedStates = lawyer.get("licensedStates") as string[] | undefined;
+    const practiceAreas = lawyer.get("practiceAreas") as string[] | undefined;
+    const serviceCities = lawyer.get("serviceCities") as string[] | undefined;
+    return lawyer.get("verificationStatus") === "approved" && licensedStates?.includes(state) &&
+      practiceAreas?.includes(incidentType) && (!serviceCities?.length || serviceCities.includes(city));
+  }).slice(0, 3);
+  if (matches.length) {
+    const batch = db.batch();
+    for (const lawyer of matches) {
+      const offerRef = db.collection("requestOffers").doc(`${ref.id}_${lawyer.id}`);
+      batch.create(offerRef, {
+        requestId: ref.id, lawyerId: lawyer.id, incidentType, city, state,
+        status: "offered", createdAt: FieldValue.serverTimestamp(),
+        expiresAt: new Date(Date.now() + 30_000),
+      });
+    }
+    await batch.commit();
+  }
+  res.status(201).json({requestId: ref.id, status: "searching", offeredLawyerCount: matches.length});
+});
+
+export const getMyOffers = endpoint(async (req, res) => {
+  const user = await authenticate(req);
+  const profile = await db.collection("users").doc(user.uid).get();
+  if (!profile.exists || profile.get("role") !== "lawyer") throw new Error("FORBIDDEN");
+  const offers = await db.collection("requestOffers").where("lawyerId", "==", user.uid)
+    .where("status", "==", "offered").limit(20).get();
+  res.status(200).json({offers: offers.docs.map((offer) => ({id: offer.id, ...offer.data()}))});
 });
 
 export const acceptLegalRequest = endpoint(async (req, res) => {
@@ -130,13 +160,15 @@ export const acceptLegalRequest = endpoint(async (req, res) => {
   const userRef = db.collection("users").doc(user.uid);
   const lawyerRef = db.collection("lawyers").doc(user.uid);
   const requestRef = db.collection("legalRequests").doc(requestId);
+  const offerRef = db.collection("requestOffers").doc(`${requestId}_${user.uid}`);
   await db.runTransaction(async (transaction) => {
-    const [profile, lawyer, legalRequest] = await Promise.all([
-      transaction.get(userRef), transaction.get(lawyerRef), transaction.get(requestRef),
+    const [profile, lawyer, legalRequest, offer] = await Promise.all([
+      transaction.get(userRef), transaction.get(lawyerRef), transaction.get(requestRef), transaction.get(offerRef),
     ]);
     if (!profile.exists || profile.get("role") !== "lawyer" || profile.get("accountStatus") !== "active") throw new Error("FORBIDDEN");
     if (!lawyer.exists || lawyer.get("verificationStatus") !== "approved" || lawyer.get("acceptingRequests") !== true) throw new Error("FORBIDDEN");
     if (!legalRequest.exists) throw new Error("NOT_FOUND");
+    if (!offer.exists || offer.get("status") !== "offered") throw new Error("FORBIDDEN");
     if (legalRequest.get("status") !== "searching") throw new Error("CONFLICT");
     if (!(lawyer.get("licensedStates") as string[] | undefined)?.includes(legalRequest.get("state"))) throw new Error("FORBIDDEN");
     transaction.update(requestRef, {
@@ -144,6 +176,7 @@ export const acceptLegalRequest = endpoint(async (req, res) => {
       assignedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    transaction.update(offerRef, {status: "accepted", acceptedAt: FieldValue.serverTimestamp()});
   });
   res.status(200).json({requestId, status: "assigned", lawyerId: user.uid});
 });

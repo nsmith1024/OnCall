@@ -30,4 +30,4 @@ public sealed class OnCallApiClient(HttpClient http, OnCallEnvironment environme
     }
 }
 
-public sealed record RequestCreated(string RequestId, string Status);
+public sealed record RequestCreated(string RequestId, string Status, int OfferedLawyerCount);

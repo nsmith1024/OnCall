@@ -21,6 +21,7 @@ namespace OnCall.Mobile {
             builder.Services.AddSingleton<OnCallEnvironment>();
             builder.Services.AddSingleton<FirebaseAuthService>();
             builder.Services.AddSingleton<OnCallApiClient>();
+            builder.Services.AddSingleton<DeviceLocationService>();
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<AppShell>();
 
