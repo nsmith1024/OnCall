@@ -25,6 +25,14 @@ async function call(name, token, body) {
   }));
 }
 
+async function status(name, token, body) {
+  return (await fetch(`${functionsUrl}/${name}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: {authorization: `Bearer ${token}`, "content-type": "application/json"},
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })).status;
+}
+
 const lawyer = await register("lawyer");
 assert.equal((await call("seedDemoLawyer", lawyer.idToken, {})).role, "lawyer");
 assert.equal((await call("setLawyerAvailability", lawyer.idToken, {available: true})).available, true);
@@ -42,12 +50,20 @@ const offers = await call("getMyOffers", lawyer.idToken);
 assert.equal(offers.offers.length, 1);
 assert.equal(offers.offers[0].requestId, request.requestId);
 assert.equal((await call("acceptLegalRequest", lawyer.idToken, {requestId: request.requestId})).status, "assigned");
+const activeSummary = (await call("getMyActiveRequest", client.idToken)).request;
+assert.equal(activeSummary.status, "assigned");
+assert.equal("location" in activeSummary, false);
+const assignedDetails = await call("getAssignedRequestDetails", lawyer.idToken, {requestId: request.requestId});
+assert.equal(assignedDetails.location.latitude, 42.6526);
+assert.equal(assignedDetails.location.longitude, -73.7562);
+assert.equal(await status("getAssignedRequestDetails", client.idToken, {requestId: request.requestId}), 403);
 const clientMeeting = await call("getMeetingSession", client.idToken, {requestId: request.requestId});
 const lawyerMeeting = await call("getMeetingSession", lawyer.idToken, {requestId: request.requestId});
 assert.equal(clientMeeting.room, lawyerMeeting.room);
 assert.equal(clientMeeting.token.split(".").length, 3);
 assert.equal((await call("getMyActiveRequest", client.idToken)).request.status, "assigned");
 assert.equal((await call("completeLegalRequest", lawyer.idToken, {requestId: request.requestId})).status, "completed");
+assert.equal(await status("getAssignedRequestDetails", lawyer.idToken, {requestId: request.requestId}), 409);
 
 await call("setLawyerAvailability", lawyer.idToken, {available: true});
 const cancellingClient = await register("cancelling-client");

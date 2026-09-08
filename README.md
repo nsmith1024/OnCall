@@ -76,6 +76,22 @@ server-side reverse geocoding and marks its jurisdiction as server-verified. A
 future Google adapter can implement the same contract without changing matching,
 Firestore documents, or mobile UI code.
 
+## Assigned-client map
+
+Before acceptance, lawyer offers contain only incident type and city/state. Once
+an offer is accepted, the assigned lawyer can request the captured coordinates
+through `getAssignedRequestDetails` and open a shared in-app OpenStreetMap view.
+Other lawyers and the client-facing summary cannot use that endpoint, and access
+ends when the request is cancelled or completed.
+
+The map renderer is registered through `IClientLocationMap`. `MapTileOptions`
+controls the tile URL and attribution, so Android and iOS use the same display
+and a self-hosted tile server can replace the development default without UI
+changes. The default `tile.openstreetmap.org` service is suitable only for
+policy-compliant development and modest interactive use; production should use
+a self-hosted or contractually supported tile endpoint. Attribution always
+remains visible.
+
 ## Production configuration (not yet enabled)
 
 Production push delivery requires Android and iOS Firebase app registrations.

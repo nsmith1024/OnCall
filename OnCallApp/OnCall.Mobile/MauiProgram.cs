@@ -2,6 +2,7 @@
 
 using OnCall.Mobile.Services;
 using OnCall.Mobile.Services.Location;
+using OnCall.Mobile.Services.Maps;
 
 namespace OnCall.Mobile {
     public static class MauiProgram {
@@ -25,6 +26,9 @@ namespace OnCall.Mobile {
             builder.Services.AddSingleton<IDeviceCoordinateProvider, MauiDeviceCoordinateProvider>();
             builder.Services.AddSingleton<IReverseGeocoder, NativeReverseGeocoder>();
             builder.Services.AddSingleton<ILocationResolver, LocationResolver>();
+            builder.Services.AddSingleton(new MapTileOptions());
+            builder.Services.AddSingleton<OpenStreetMapHtmlRenderer>();
+            builder.Services.AddSingleton<IClientLocationMap, OpenStreetMapClientLocationMap>();
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<AppShell>();
 

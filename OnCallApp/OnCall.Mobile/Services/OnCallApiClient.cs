@@ -26,6 +26,8 @@ public sealed class OnCallApiClient(HttpClient http, OnCallEnvironment environme
         SendAsync<JitsiSession>(HttpMethod.Post, "getMeetingSession", new {requestId}, token);
     public Task<RequestState> CompleteRequestAsync(string requestId, CancellationToken token = default) =>
         SendAsync<RequestState>(HttpMethod.Post, "completeLegalRequest", new {requestId}, token);
+    public Task<AssignedRequestDetails> GetAssignedRequestDetailsAsync(string requestId, CancellationToken token = default) =>
+        SendAsync<AssignedRequestDetails>(HttpMethod.Post, "getAssignedRequestDetails", new {requestId}, token);
 
     private async Task<T> SendAsync<T>(HttpMethod method, string function, object? body, CancellationToken token)
     {

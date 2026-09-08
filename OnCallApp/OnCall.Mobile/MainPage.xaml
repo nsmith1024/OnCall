@@ -72,6 +72,7 @@
                 </VerticalStackLayout>
 
                 <Button x:Name="JoinMeetingButton" IsVisible="False" Text="Join Secure Video Call" Clicked="OnJoinMeetingClicked" />
+                <Button x:Name="ShowClientLocationButton" IsVisible="False" Text="Show Client Location" Clicked="OnShowClientLocationClicked" />
                 <Button x:Name="CompleteRequestButton" IsVisible="False" Text="Complete Legal Session" Clicked="OnCompleteRequestClicked" />
 
                 <Button Text="Sign Out" Clicked="OnSignOutClicked" />

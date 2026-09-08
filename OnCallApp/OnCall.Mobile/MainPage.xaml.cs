@@ -1,6 +1,7 @@
 using OnCall.Mobile.Models;
 using OnCall.Mobile.Services;
 using OnCall.Mobile.Services.Location;
+using OnCall.Mobile.Services.Maps;
 
 namespace OnCall.Mobile;
 
@@ -9,18 +10,20 @@ public partial class MainPage : ContentPage
     private readonly FirebaseAuthService auth;
     private readonly OnCallApiClient api;
     private readonly ILocationResolver locations;
+    private readonly IClientLocationMap clientLocationMap;
     private ResolvedLocation? currentLocation;
     private LegalRequestSummary? activeRequest;
     private string? meetingRequestId;
     private bool initialized;
     private bool loadingProfile;
 
-    public MainPage(FirebaseAuthService auth, OnCallApiClient api, ILocationResolver locations)
+    public MainPage(FirebaseAuthService auth, OnCallApiClient api, ILocationResolver locations, IClientLocationMap clientLocationMap)
     {
         InitializeComponent();
         this.auth = auth;
         this.api = api;
         this.locations = locations;
+        this.clientLocationMap = clientLocationMap;
         IncidentPicker.SelectedIndex = 0;
     }
 
@@ -122,6 +125,7 @@ public partial class MainPage : ContentPage
         meetingRequestId = activeRequest?.Status == "assigned" ? activeRequest.Id : null;
         JoinMeetingButton.IsVisible = meetingRequestId is not null;
         CompleteRequestButton.IsVisible = false;
+        ShowClientLocationButton.IsVisible = false;
         RequestStatusLabel.Text = activeRequest is null ? "" : $"{activeRequest.IncidentType} in {activeRequest.City}, {activeRequest.State}: {activeRequest.Status}";
     }
 
@@ -169,6 +173,7 @@ public partial class MainPage : ContentPage
             meetingRequestId = result.RequestId;
             JoinMeetingButton.IsVisible = true;
             CompleteRequestButton.IsVisible = true;
+            ShowClientLocationButton.IsVisible = true;
             StatusLabel.Text = $"Request {result.RequestId[..8]} assigned to you.";
             await RefreshOffersAsync();
         });
@@ -196,6 +201,7 @@ public partial class MainPage : ContentPage
         meetingRequestId = result.Request?.Id;
         JoinMeetingButton.IsVisible = meetingRequestId is not null;
         CompleteRequestButton.IsVisible = meetingRequestId is not null;
+        ShowClientLocationButton.IsVisible = meetingRequestId is not null;
     }
 
     private async void OnCompleteRequestClicked(object? sender, EventArgs e)
@@ -208,7 +214,18 @@ public partial class MainPage : ContentPage
             await api.CompleteRequestAsync(meetingRequestId);
             meetingRequestId = null;
             JoinMeetingButton.IsVisible = CompleteRequestButton.IsVisible = false;
+            ShowClientLocationButton.IsVisible = false;
             StatusLabel.Text = "Legal session completed. Turn availability on when ready for another request.";
+        });
+    }
+
+    private async void OnShowClientLocationClicked(object? sender, EventArgs e)
+    {
+        if (meetingRequestId is null) return;
+        await RunBusyAsync(async () =>
+        {
+            AssignedRequestDetails request = await api.GetAssignedRequestDetailsAsync(meetingRequestId);
+            await clientLocationMap.ShowAsync(this, request);
         });
     }
 

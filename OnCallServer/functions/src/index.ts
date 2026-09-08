@@ -121,6 +121,17 @@ function signJwt(payload: Record<string, unknown>, secret: string): string {
   return `${unsigned}.${createHmac("sha256", secret).update(unsigned).digest("base64url")}`;
 }
 
+function requestSummary(document: admin.firestore.DocumentSnapshot) {
+  return {
+    id: document.id,
+    incidentType: document.get("incidentType"),
+    city: document.get("city"),
+    state: document.get("state"),
+    status: document.get("status"),
+    assignedLawyerId: document.get("assignedLawyerId") ?? null,
+  };
+}
+
 export const createLegalRequest = endpoint(async (req, res) => {
   if (req.method !== "POST") throw new Error("INVALID_METHOD");
   const user = await authenticate(req);
@@ -189,7 +200,7 @@ export const getMyActiveRequest = endpoint(async (req, res) => {
     return;
   }
   const request = active.docs[0];
-  res.status(200).json({request: {id: request.id, ...request.data()}});
+  res.status(200).json({request: requestSummary(request)});
 });
 
 export const getMyActiveAssignment = endpoint(async (req, res) => {
@@ -201,7 +212,30 @@ export const getMyActiveAssignment = endpoint(async (req, res) => {
     return;
   }
   const request = assigned.docs[0];
-  res.status(200).json({request: {id: request.id, ...request.data()}});
+  res.status(200).json({request: requestSummary(request)});
+});
+
+export const getAssignedRequestDetails = endpoint(async (req, res) => {
+  if (req.method !== "POST") throw new Error("INVALID_METHOD");
+  const user = await authenticate(req);
+  const requestId = requiredText(req.body?.requestId, "requestId", 128);
+  const legalRequest = await db.collection("legalRequests").doc(requestId).get();
+  if (!legalRequest.exists) throw new Error("NOT_FOUND");
+  if (legalRequest.get("status") !== "assigned") throw new Error("CONFLICT");
+  if (legalRequest.get("assignedLawyerId") !== user.uid) throw new Error("FORBIDDEN");
+  const profile = await db.collection("users").doc(user.uid).get();
+  if (!profile.exists || profile.get("role") !== "lawyer" || profile.get("accountStatus") !== "active") throw new Error("FORBIDDEN");
+  const location = legalRequest.get("location") as GeoPoint | undefined;
+  if (!location) throw new Error("LOCATION_NOT_FOUND");
+  res.status(200).json({
+    requestId,
+    incidentType: legalRequest.get("incidentType"),
+    location: {
+      latitude: location.latitude, longitude: location.longitude,
+      city: legalRequest.get("city"), state: legalRequest.get("state"),
+      county: legalRequest.get("county") ?? null, postalCode: legalRequest.get("postalCode") ?? null,
+    },
+  });
 });
 
 export const cancelLegalRequest = endpoint(async (req, res) => {
