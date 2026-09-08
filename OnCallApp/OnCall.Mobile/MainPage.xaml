@@ -37,6 +37,16 @@
                     <Button Text="Use My Current Location" Clicked="OnUseLocationClicked" />
                     <Label x:Name="LocationLabel" Text="Location has not been collected." TextColor="Gray" />
                     <Button Text="Request a Lawyer" Clicked="OnRequestLawyerClicked" BackgroundColor="#B42318" TextColor="White" />
+                    <Border x:Name="ActiveRequestPanel" IsVisible="False" Stroke="#B42318" StrokeShape="RoundRectangle 12" Padding="16">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Active request" FontAttributes="Bold" />
+                            <Label x:Name="RequestStatusLabel" />
+                            <HorizontalStackLayout Spacing="8">
+                                <Button Text="Refresh" Clicked="OnRefreshRequestClicked" />
+                                <Button Text="Cancel Request" Clicked="OnCancelRequestClicked" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
                 </VerticalStackLayout>
 
                 <VerticalStackLayout x:Name="LawyerPanel" IsVisible="False" Spacing="12">
@@ -60,6 +70,9 @@
                         </CollectionView.ItemTemplate>
                     </CollectionView>
                 </VerticalStackLayout>
+
+                <Button x:Name="JoinMeetingButton" IsVisible="False" Text="Join Secure Video Call" Clicked="OnJoinMeetingClicked" />
+                <Button x:Name="CompleteRequestButton" IsVisible="False" Text="Complete Legal Session" Clicked="OnCompleteRequestClicked" />
 
                 <Button Text="Sign Out" Clicked="OnSignOutClicked" />
             </VerticalStackLayout>

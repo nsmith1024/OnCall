@@ -28,6 +28,7 @@ async function call(name, token, body) {
 const lawyer = await register("lawyer");
 assert.equal((await call("seedDemoLawyer", lawyer.idToken, {})).role, "lawyer");
 assert.equal((await call("setLawyerAvailability", lawyer.idToken, {available: true})).available, true);
+assert.equal(typeof (await call("registerDevice", lawyer.idToken, {platform: "android", token: `test-token-${suffix}`})).deviceId, "string");
 
 const client = await register("client");
 assert.equal((await call("getMyProfile", client.idToken)).role, "client");
@@ -41,5 +42,20 @@ const offers = await call("getMyOffers", lawyer.idToken);
 assert.equal(offers.offers.length, 1);
 assert.equal(offers.offers[0].requestId, request.requestId);
 assert.equal((await call("acceptLegalRequest", lawyer.idToken, {requestId: request.requestId})).status, "assigned");
+const clientMeeting = await call("getMeetingSession", client.idToken, {requestId: request.requestId});
+const lawyerMeeting = await call("getMeetingSession", lawyer.idToken, {requestId: request.requestId});
+assert.equal(clientMeeting.room, lawyerMeeting.room);
+assert.equal(clientMeeting.token.split(".").length, 3);
+assert.equal((await call("getMyActiveRequest", client.idToken)).request.status, "assigned");
+assert.equal((await call("completeLegalRequest", lawyer.idToken, {requestId: request.requestId})).status, "completed");
 
-console.log("Emulator integration passed: client profile -> matched offer -> lawyer assignment.");
+await call("setLawyerAvailability", lawyer.idToken, {available: true});
+const cancellingClient = await register("cancelling-client");
+await call("getMyProfile", cancellingClient.idToken);
+const cancellingRequest = await call("createLegalRequest", cancellingClient.idToken, {
+  incidentType: "criminal", latitude: 42.6526, longitude: -73.7562, city: "Albany", state: "NY",
+});
+assert.equal((await call("cancelLegalRequest", cancellingClient.idToken, {requestId: cancellingRequest.requestId})).status, "cancelled");
+assert.equal((await call("getMyActiveRequest", cancellingClient.idToken)).request, null);
+
+console.log("Emulator integration passed: profile, presence, matching, assignment, cancellation, and Jitsi authorization.");

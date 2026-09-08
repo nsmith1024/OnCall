@@ -9,10 +9,26 @@
       ]
     },
     {
+      "collectionGroup": "legalRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedLawyerId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "requestOffers",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "lawyerId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "requestOffers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "requestId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
     }

@@ -12,10 +12,20 @@ public sealed class OnCallApiClient(HttpClient http, OnCallEnvironment environme
     public Task<RequestCreated> CreateLegalRequestAsync(string type, double latitude, double longitude, string city, string state, CancellationToken token = default) =>
         SendAsync<RequestCreated>(HttpMethod.Post, "createLegalRequest", new {incidentType = type, latitude, longitude, city, state}, token);
     public Task<OfferList> GetMyOffersAsync(CancellationToken token = default) => SendAsync<OfferList>(HttpMethod.Get, "getMyOffers", null, token);
+    public Task<ActiveRequestResult> GetMyActiveRequestAsync(CancellationToken token = default) =>
+        SendAsync<ActiveRequestResult>(HttpMethod.Get, "getMyActiveRequest", null, token);
+    public Task<ActiveRequestResult> GetMyActiveAssignmentAsync(CancellationToken token = default) =>
+        SendAsync<ActiveRequestResult>(HttpMethod.Get, "getMyActiveAssignment", null, token);
+    public Task<RequestState> CancelRequestAsync(string requestId, CancellationToken token = default) =>
+        SendAsync<RequestState>(HttpMethod.Post, "cancelLegalRequest", new {requestId}, token);
     public Task<AvailabilityResult> SetAvailabilityAsync(bool available, CancellationToken token = default) =>
         SendAsync<AvailabilityResult>(HttpMethod.Post, "setLawyerAvailability", new {available}, token);
     public Task<AssignmentResult> AcceptOfferAsync(string requestId, CancellationToken token = default) =>
         SendAsync<AssignmentResult>(HttpMethod.Post, "acceptLegalRequest", new {requestId}, token);
+    public Task<JitsiSession> GetMeetingSessionAsync(string requestId, CancellationToken token = default) =>
+        SendAsync<JitsiSession>(HttpMethod.Post, "getMeetingSession", new {requestId}, token);
+    public Task<RequestState> CompleteRequestAsync(string requestId, CancellationToken token = default) =>
+        SendAsync<RequestState>(HttpMethod.Post, "completeLegalRequest", new {requestId}, token);
 
     private async Task<T> SendAsync<T>(HttpMethod method, string function, object? body, CancellationToken token)
     {
@@ -40,3 +50,7 @@ public sealed record LegalOffer(string Id, string RequestId, string IncidentType
 public sealed record OfferList(IReadOnlyList<LegalOffer> Offers);
 public sealed record AvailabilityResult(bool Available);
 public sealed record AssignmentResult(string RequestId, string Status, string LawyerId);
+public sealed record LegalRequestSummary(string Id, string IncidentType, string City, string State, string Status, string? AssignedLawyerId);
+public sealed record ActiveRequestResult(LegalRequestSummary? Request);
+public sealed record RequestState(string RequestId, string Status);
+public sealed record JitsiSession(string ServerUrl, string Room, string Token, DateTimeOffset ExpiresAt);

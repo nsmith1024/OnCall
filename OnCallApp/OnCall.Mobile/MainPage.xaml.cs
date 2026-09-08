@@ -9,6 +9,8 @@ public partial class MainPage : ContentPage
     private readonly OnCallApiClient api;
     private readonly DeviceLocationService locations;
     private ResolvedLocation? currentLocation;
+    private LegalRequestSummary? activeRequest;
+    private string? meetingRequestId;
     private bool initialized;
     private bool loadingProfile;
 
@@ -66,6 +68,12 @@ public partial class MainPage : ContentPage
         LawyerPanel.IsVisible = lawyer;
         AuthPanel.IsVisible = false;
         HomePanel.IsVisible = true;
+        if (lawyer)
+        {
+            await RefreshActiveAssignmentAsync();
+            await RefreshOffersAsync();
+        }
+        else await RefreshActiveRequestAsync();
     }
 
     private async void OnRequestLawyerClicked(object? sender, EventArgs e)
@@ -82,6 +90,7 @@ public partial class MainPage : ContentPage
             StatusLabel.Text = result.OfferedLawyerCount > 0
                 ? $"Request {result.RequestId[..8]} sent to {result.OfferedLawyerCount} available lawyer(s)."
                 : $"Request {result.RequestId[..8]} is searching; no demo lawyer is currently available.";
+            await RefreshActiveRequestAsync();
         });
     }
 
@@ -100,6 +109,32 @@ public partial class MainPage : ContentPage
         HomePanel.IsVisible = false;
         AuthPanel.IsVisible = true;
         StatusLabel.Text = "Signed out.";
+    }
+
+    private async void OnRefreshRequestClicked(object? sender, EventArgs e) => await RunBusyAsync(RefreshActiveRequestAsync);
+
+    private async Task RefreshActiveRequestAsync()
+    {
+        ActiveRequestResult result = await api.GetMyActiveRequestAsync();
+        activeRequest = result.Request;
+        ActiveRequestPanel.IsVisible = activeRequest is not null;
+        meetingRequestId = activeRequest?.Status == "assigned" ? activeRequest.Id : null;
+        JoinMeetingButton.IsVisible = meetingRequestId is not null;
+        CompleteRequestButton.IsVisible = false;
+        RequestStatusLabel.Text = activeRequest is null ? "" : $"{activeRequest.IncidentType} in {activeRequest.City}, {activeRequest.State}: {activeRequest.Status}";
+    }
+
+    private async void OnCancelRequestClicked(object? sender, EventArgs e)
+    {
+        if (activeRequest is null) return;
+        bool cancel = await DisplayAlertAsync("Cancel request?", "Available lawyers will be told this request is no longer active.", "Cancel Request", "Keep Searching");
+        if (!cancel) return;
+        await RunBusyAsync(async () =>
+        {
+            await api.CancelRequestAsync(activeRequest.Id);
+            StatusLabel.Text = "Request cancelled.";
+            await RefreshActiveRequestAsync();
+        });
     }
 
     private async void OnAvailabilityToggled(object? sender, ToggledEventArgs e)
@@ -130,8 +165,49 @@ public partial class MainPage : ContentPage
         await RunBusyAsync(async () =>
         {
             AssignmentResult result = await api.AcceptOfferAsync(offer.RequestId);
+            meetingRequestId = result.RequestId;
+            JoinMeetingButton.IsVisible = true;
+            CompleteRequestButton.IsVisible = true;
             StatusLabel.Text = $"Request {result.RequestId[..8]} assigned to you.";
             await RefreshOffersAsync();
+        });
+    }
+
+    private async void OnJoinMeetingClicked(object? sender, EventArgs e)
+    {
+        if (meetingRequestId is null) return;
+        await RunBusyAsync(async () =>
+        {
+            JitsiSession session = await api.GetMeetingSessionAsync(meetingRequestId);
+            if (new Uri(session.ServerUrl).Host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusLabel.Text = "Meeting authorization works; configure the production Jitsi domain before opening calls.";
+                return;
+            }
+            string url = $"{session.ServerUrl.TrimEnd('/')}/{Uri.EscapeDataString(session.Room)}?jwt={Uri.EscapeDataString(session.Token)}";
+            await Browser.Default.OpenAsync(url, BrowserLaunchMode.SystemPreferred);
+        });
+    }
+
+    private async Task RefreshActiveAssignmentAsync()
+    {
+        ActiveRequestResult result = await api.GetMyActiveAssignmentAsync();
+        meetingRequestId = result.Request?.Id;
+        JoinMeetingButton.IsVisible = meetingRequestId is not null;
+        CompleteRequestButton.IsVisible = meetingRequestId is not null;
+    }
+
+    private async void OnCompleteRequestClicked(object? sender, EventArgs e)
+    {
+        if (meetingRequestId is null) return;
+        bool complete = await DisplayAlertAsync("Complete session?", "This closes the legal request and ends access to its meeting.", "Complete", "Keep Open");
+        if (!complete) return;
+        await RunBusyAsync(async () =>
+        {
+            await api.CompleteRequestAsync(meetingRequestId);
+            meetingRequestId = null;
+            JoinMeetingButton.IsVisible = CompleteRequestButton.IsVisible = false;
+            StatusLabel.Text = "Legal session completed. Turn availability on when ready for another request.";
         });
     }
 

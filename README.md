@@ -10,6 +10,10 @@ OnCall is a shared .NET MAUI mobile app for clients and lawyers, backed by Fireb
 - Authenticated profile creation
 - Client legal-request creation
 - Transactional lawyer acceptance so only one lawyer can claim a request
+- Client request status and cancellation
+- Lawyer presence, expiring offers, assignment restoration, and completion
+- Durable notification outbox with production FCM/APNs delivery
+- Five-minute, participant-only Jitsi JWT session credentials
 - Closed-by-default Firestore and Storage rules
 
 ## Run locally
@@ -44,3 +48,17 @@ dotnet build OnCall.Mobile\OnCall.Mobile.csproj -f net10.0-android
 ```
 
 No Firebase production resources are required for the local flow.
+
+## Production configuration (not yet enabled)
+
+Production push delivery requires Android and iOS Firebase app registrations.
+The resulting `google-services.json` and `GoogleService-Info.plist` files are
+intentionally ignored by Git.
+
+Before deploying Jitsi meeting credentials, configure:
+
+- Firebase secret `JITSI_JWT_SECRET`, shared only with the self-hosted Jitsi server
+- Function environment value `JITSI_SERVER_URL`, such as `https://meet.example.com`
+
+Meeting credentials are issued only while a request is assigned, only to its
+client and assigned lawyer, and expire after five minutes.
