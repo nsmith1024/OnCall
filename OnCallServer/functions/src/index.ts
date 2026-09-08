@@ -1,10 +1,12 @@
 import {setGlobalOptions} from "firebase-functions/v2";
 import {onRequest, Request} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import {DecodedIdToken, getAuth} from "firebase-admin/auth";
+import {FieldValue, GeoPoint, getFirestore} from "firebase-admin/firestore";
 import {Response} from "express";
 
 admin.initializeApp();
-const db = admin.firestore();
+const db = getFirestore();
 setGlobalOptions({region: "us-central1", maxInstances: 10});
 
 type Handler = (req: Request, res: Response) => Promise<void>;
@@ -23,10 +25,10 @@ function requiredNumber(value: unknown, field: string, min: number, max: number)
   return value;
 }
 
-async function authenticate(req: Request): Promise<admin.auth.DecodedIdToken> {
+async function authenticate(req: Request): Promise<DecodedIdToken> {
   const header = req.header("authorization") ?? "";
   if (!header.startsWith("Bearer ")) throw new Error("UNAUTHENTICATED");
-  return admin.auth().verifyIdToken(header.substring(7));
+  return getAuth().verifyIdToken(header.substring(7));
 }
 
 function statusFor(error: unknown): number {
@@ -68,8 +70,8 @@ export const getMyProfile = endpoint(async (req, res) => {
       displayName: user.email?.split("@")[0] ?? "OnCall user",
       role: "client",
       accountStatus: "active",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     profile = await ref.get();
   }
@@ -85,11 +87,11 @@ export const updateMyProfile = endpoint(async (req, res) => {
   if (!profile.exists) {
     await ref.create({
       email: user.email ?? null, displayName, role: "client", accountStatus: "active",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
   } else {
-    await ref.update({displayName, updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+    await ref.update({displayName, updatedAt: FieldValue.serverTimestamp()});
   }
   res.status(200).json({ok: true});
 });
@@ -113,10 +115,10 @@ export const createLegalRequest = endpoint(async (req, res) => {
   const ref = db.collection("legalRequests").doc();
   await ref.create({
     clientId: user.uid, incidentType,
-    location: new admin.firestore.GeoPoint(latitude, longitude), city, state,
+    location: new GeoPoint(latitude, longitude), city, state,
     status: "searching", assignedLawyerId: null,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
   res.status(201).json({requestId: ref.id, status: "searching"});
 });
@@ -139,8 +141,8 @@ export const acceptLegalRequest = endpoint(async (req, res) => {
     if (!(lawyer.get("licensedStates") as string[] | undefined)?.includes(legalRequest.get("state"))) throw new Error("FORBIDDEN");
     transaction.update(requestRef, {
       status: "assigned", assignedLawyerId: user.uid,
-      assignedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      assignedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
   });
   res.status(200).json({requestId, status: "assigned", lawyerId: user.uid});
@@ -153,12 +155,12 @@ export const seedDemoLawyer = endpoint(async (req, res) => {
   const user = await authenticate(req);
   await db.collection("users").doc(user.uid).set({
     email: user.email ?? null, displayName: "Demo Lawyer", role: "lawyer", accountStatus: "active",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
   }, {merge: true});
   await db.collection("lawyers").doc(user.uid).set({
     verificationStatus: "approved", licensedStates: ["NY"],
     practiceAreas: ["traffic", "criminal"], serviceCities: ["Albany", "Troy"],
-    acceptingRequests: true, updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    acceptingRequests: true, updatedAt: FieldValue.serverTimestamp(),
   }, {merge: true});
   res.status(200).json({ok: true, role: "lawyer"});
 });

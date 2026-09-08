@@ -1,17 +1,53 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="OnCall.Mobile.MainPage">
+             x:Class="OnCall.Mobile.MainPage"
+             Title="OnCall">
+    <ScrollView>
+        <VerticalStackLayout Padding="28" Spacing="18" MaximumWidthRequest="520">
+            <Label Text="OnCall" FontSize="36" FontAttributes="Bold" />
+            <Label Text="Legal help when you need it" FontSize="18" TextColor="Gray" />
 
-    <VerticalStackLayout Padding="30" Spacing="25" VerticalOptions="Center">
-        <Button Text="Fetch Value from Firebase" 
-                Clicked="OnFetchButtonClicked"
-                HorizontalOptions="Center" />
+            <ActivityIndicator x:Name="BusyIndicator" IsVisible="False" IsRunning="False" />
 
-        <Label x:Name="ResultLabel"
-               Text="Value will appear here..."
-               FontSize="20"
-               HorizontalOptions="Center" />
-    </VerticalStackLayout>
+            <VerticalStackLayout x:Name="AuthPanel" Spacing="12">
+                <Label Text="Sign in or create an account" FontSize="22" FontAttributes="Bold" />
+                <Entry x:Name="EmailEntry" Placeholder="Email address" Keyboard="Email" />
+                <Entry x:Name="PasswordEntry" Placeholder="Password (at least 6 characters)" IsPassword="True" />
+                <Button Text="Sign In" Clicked="OnSignInClicked" />
+                <Button Text="Create Account" Clicked="OnRegisterClicked" />
+                <Label Text="Development currently uses the local Firebase emulators." FontSize="12" TextColor="Gray" />
+            </VerticalStackLayout>
 
+            <VerticalStackLayout x:Name="HomePanel" IsVisible="False" Spacing="14">
+                <Label x:Name="WelcomeLabel" FontSize="24" FontAttributes="Bold" />
+                <Border Stroke="#DDDDDD" StrokeShape="RoundRectangle 12" Padding="16">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Account" FontAttributes="Bold" />
+                        <Label x:Name="RoleLabel" />
+                        <Label x:Name="EmailLabel" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout x:Name="ClientPanel" Spacing="12">
+                    <Label Text="Request legal help" FontSize="20" FontAttributes="Bold" />
+                    <Picker x:Name="IncidentPicker" Title="Type of help">
+                        <Picker.Items><x:String>Traffic</x:String><x:String>Criminal</x:String><x:String>Other</x:String></Picker.Items>
+                    </Picker>
+                    <Entry x:Name="CityEntry" Placeholder="City (temporary until GPS milestone)" />
+                    <Entry x:Name="StateEntry" Placeholder="State, for example NY" MaxLength="2" />
+                    <Button Text="Request a Lawyer" Clicked="OnRequestLawyerClicked" BackgroundColor="#B42318" TextColor="White" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout x:Name="LawyerPanel" IsVisible="False" Spacing="12">
+                    <Label Text="Lawyer dashboard" FontSize="20" FontAttributes="Bold" />
+                    <Label Text="Availability and incoming requests are the next milestone." />
+                </VerticalStackLayout>
+
+                <Button Text="Sign Out" Clicked="OnSignOutClicked" />
+            </VerticalStackLayout>
+
+            <Label x:Name="StatusLabel" TextColor="#B42318" />
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

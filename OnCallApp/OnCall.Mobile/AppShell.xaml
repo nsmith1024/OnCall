@@ -6,9 +6,8 @@
     xmlns:local="clr-namespace:OnCall.Mobile"
     Title="OnCall.Mobile">
 
-    <ShellContent
+    <ShellContent x:Name="HomeContent"
         Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
         Route="MainPage" />
 
 </Shell>
