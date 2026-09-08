@@ -8,6 +8,7 @@ import {FieldValue, GeoPoint, getFirestore} from "firebase-admin/firestore";
 import {getMessaging} from "firebase-admin/messaging";
 import {Response} from "express";
 import {createHash, createHmac, randomUUID} from "node:crypto";
+import {reverseGeocode} from "./geocoding/index.js";
 
 admin.initializeApp();
 const db = getFirestore();
@@ -126,8 +127,10 @@ export const createLegalRequest = endpoint(async (req, res) => {
   const incidentType = requiredText(req.body?.incidentType, "incidentType", 60).toLowerCase();
   const latitude = requiredNumber(req.body?.latitude, "latitude", -90, 90);
   const longitude = requiredNumber(req.body?.longitude, "longitude", -180, 180);
-  const city = requiredText(req.body?.city, "city", 100);
-  const state = requiredText(req.body?.state, "state", 40).toUpperCase();
+  const cityHint = requiredText(req.body?.city, "city", 100);
+  const stateHint = requiredText(req.body?.state, "state", 40).toUpperCase();
+  const jurisdiction = await reverseGeocode({latitude, longitude}, {city: cityHint, state: stateHint});
+  const {city, state} = jurisdiction;
   const profile = await db.collection("users").doc(user.uid).get();
   if (!profile.exists || profile.get("role") !== "client" || profile.get("accountStatus") !== "active") {
     throw new Error("FORBIDDEN");
@@ -140,6 +143,8 @@ export const createLegalRequest = endpoint(async (req, res) => {
   await ref.create({
     clientId: user.uid, incidentType,
     location: new GeoPoint(latitude, longitude), city, state,
+    county: jurisdiction.county ?? null, postalCode: jurisdiction.postalCode ?? null,
+    geocodingProvider: jurisdiction.provider, locationVerifiedByServer: jurisdiction.verifiedByServer,
     status: "searching", assignedLawyerId: null,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),

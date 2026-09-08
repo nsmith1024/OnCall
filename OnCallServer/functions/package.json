@@ -8,6 +8,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
+    "test": "npm run build && npm run test:unit",
+    "test:unit": "node test/geocoding-unit.mjs",
     "test:integration": "node test/emulator-integration.mjs"
   },
   "engines": {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 
 using OnCall.Mobile.Services;
+using OnCall.Mobile.Services.Location;
 
 namespace OnCall.Mobile {
     public static class MauiProgram {
@@ -21,7 +22,9 @@ namespace OnCall.Mobile {
             builder.Services.AddSingleton<OnCallEnvironment>();
             builder.Services.AddSingleton<FirebaseAuthService>();
             builder.Services.AddSingleton<OnCallApiClient>();
-            builder.Services.AddSingleton<DeviceLocationService>();
+            builder.Services.AddSingleton<IDeviceCoordinateProvider, MauiDeviceCoordinateProvider>();
+            builder.Services.AddSingleton<IReverseGeocoder, NativeReverseGeocoder>();
+            builder.Services.AddSingleton<ILocationResolver, LocationResolver>();
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<AppShell>();
 

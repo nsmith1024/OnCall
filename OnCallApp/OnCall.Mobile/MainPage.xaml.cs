@@ -1,5 +1,6 @@
 using OnCall.Mobile.Models;
 using OnCall.Mobile.Services;
+using OnCall.Mobile.Services.Location;
 
 namespace OnCall.Mobile;
 
@@ -7,14 +8,14 @@ public partial class MainPage : ContentPage
 {
     private readonly FirebaseAuthService auth;
     private readonly OnCallApiClient api;
-    private readonly DeviceLocationService locations;
+    private readonly ILocationResolver locations;
     private ResolvedLocation? currentLocation;
     private LegalRequestSummary? activeRequest;
     private string? meetingRequestId;
     private bool initialized;
     private bool loadingProfile;
 
-    public MainPage(FirebaseAuthService auth, OnCallApiClient api, DeviceLocationService locations)
+    public MainPage(FirebaseAuthService auth, OnCallApiClient api, ILocationResolver locations)
     {
         InitializeComponent();
         this.auth = auth;
@@ -98,8 +99,8 @@ public partial class MainPage : ContentPage
     {
         await RunBusyAsync(async () =>
         {
-            currentLocation = await locations.GetCurrentAsync();
-            LocationLabel.Text = $"{currentLocation.City}, {currentLocation.State}";
+            currentLocation = await locations.ResolveCurrentAsync();
+            LocationLabel.Text = $"{currentLocation.City}, {currentLocation.State} ({currentLocation.Provider})";
         });
     }
 
